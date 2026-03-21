@@ -73,9 +73,7 @@
                             FontSize="14"
                             FontWeight="Bold"
                             Background="#2196F3"
-                            Foreground="White"
-                            Height="50"
-                            Width="180"/>
+                            Foreground="White"/>
 
                     <Button Command="{Binding StopRecordingCommand}"
                             Content="⏹️ Aufnahme stoppen"
@@ -85,8 +83,7 @@
                             Background="#FF5722"
                             Foreground="White"
                             Height="50"
-                            Margin="10,0,0,0"
-                            Width="180"/>
+                            Margin="10,0,0,0"/>
                 </StackPanel>
 
                 <!-- Status-Anzeige -->

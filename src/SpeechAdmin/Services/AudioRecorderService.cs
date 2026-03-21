@@ -22,7 +22,7 @@ namespace SpeechAdmin.Services
         /// <summary>
         /// Starts audio recording
         /// </summary>
-        public void StartRecording(string outputPath)
+        public void StartRecording(string outputPath, int deviceNumber = 0)
         {
             try
             {
@@ -35,17 +35,28 @@ namespace SpeechAdmin.Services
                 // Initialize NAudio components
                 _waveIn = new WaveInEvent
                 {
+                    DeviceNumber = deviceNumber,
                     WaveFormat = new WaveFormat(16000, 16, 1) // 16kHz, 16-bit, Mono
                 };
                 _waveWriter = new WaveFileWriter(_currentFilePath, _waveIn.WaveFormat);
 
                 _waveIn.DataAvailable += OnDataAvailable;
+                _waveIn.RecordingStopped += WaveInOnRecordingStopped;
                 _waveIn.StartRecording();
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error starting recording: {Message}", ex.Message);
                 IsRecording = false;
+            }
+        }
+
+        private void WaveInOnRecordingStopped(object? sender, StoppedEventArgs e)
+        {
+            if (e.Exception != null)
+            {
+                _logger.LogError(e.Exception, "Recording stopped due to an error: {Message}", e.Exception.Message);
+                throw e.Exception;
             }
         }
 
@@ -61,6 +72,8 @@ namespace SpeechAdmin.Services
             _logger.LogInformation("Audio recording stopped");
 
             _waveIn?.StopRecording();
+            _waveIn?.RecordingStopped -= WaveInOnRecordingStopped;
+            _waveIn?.DataAvailable -= OnDataAvailable;
             _waveIn?.Dispose();
 
             _waveIn = null;

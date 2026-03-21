@@ -12,7 +12,7 @@ namespace SpeechAdmin.Services
     /// </summary>
     public class SpeechModelManagerService
     {
-        private Dictionary<string, ISpeechModel> _models = new();
+        private readonly Dictionary<string, ISpeechModel> _models = new();
         private ISpeechModel? _currentModel;
         private readonly ILogger<SpeechModelManagerService> _logger;
 
@@ -51,7 +51,10 @@ namespace SpeechAdmin.Services
         /// <summary>
         /// Returns all available models
         /// </summary>
-        public IEnumerable<ISpeechModel> GetAvailableModels() => _models.Values;
+        public IEnumerable<ISpeechModel> GetAvailableModels()
+        {
+            return _models.Values;
+        }
 
         /// <summary>
         /// Sets the current model

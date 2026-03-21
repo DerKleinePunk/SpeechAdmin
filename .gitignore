@@ -7,8 +7,6 @@ obj/
 .vscode/
 
 # Models directory (large files)
-Models/
-models/
 *.bin
 
 # Logs

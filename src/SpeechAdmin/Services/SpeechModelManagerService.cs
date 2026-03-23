@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using SpeechAdmin.Models;
+using SpeechAdmin.SpeechModels;
 using System;
 using System.Collections.Generic;
 using System.Linq;

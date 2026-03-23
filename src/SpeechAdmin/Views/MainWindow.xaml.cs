@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using SpeechAdmin.Configuration;
 using SpeechAdmin.Services;
 using SpeechAdmin.ViewModels;
 using System;
@@ -14,13 +15,17 @@ namespace SpeechAdmin.Views
     {
         private HotKeyService? _hotKeyService;
         private readonly ILogger<MainWindow> _logger;
-        private const uint MOD_CTRL = 0x0002;
-        private const uint MOD_ALT = 0x0001;
-        private const uint VK_R = 0x52; // R key virtual code
+        private readonly AppSettings _appSettings;
 
-        public MainWindow()
+        public MainWindow() : this(new AppSettings())
+        {
+        }
+
+        public MainWindow(AppSettings appSettings)
         {
             InitializeComponent();
+
+            _appSettings = appSettings;
 
             // Create a temporary logger until DI logger is available
             _logger = new NullLogger<MainWindow>();
@@ -31,7 +36,7 @@ namespace SpeechAdmin.Views
 
         private void MainWindow_SourceInitialized(object? sender, EventArgs e)
         {
-            // Hotkey: Ctrl+Alt+R to start recording
+            // Register global hotkeys from configuration
             RegisterGlobalHotKeys();
         }
 
@@ -42,8 +47,12 @@ namespace SpeechAdmin.Views
                 var helper = new WindowInteropHelper(this);
                 _hotKeyService = new HotKeyService(helper.Handle);
 
-                // Register hotkey: Ctrl+Alt+R
-                _hotKeyService.RegisterHotKey(MOD_CTRL | MOD_ALT, VK_R, () =>
+                // Get hotkey configuration
+                var modifiers = _appSettings.Application.HotKey.GetModifierFlags();
+                var key = _appSettings.Application.HotKey.GetVirtualKeyCode();
+
+                // Register hotkey from configuration
+                _hotKeyService.RegisterHotKey(modifiers, key, () =>
                 {
                     Dispatcher.Invoke(() =>
                     {
@@ -59,12 +68,15 @@ namespace SpeechAdmin.Views
                         if (vm is not { IsRecording: false }) return;
 
                         vm.StartRecordingCommand?.Execute(null);
-                        _logger.LogInformation("Recording started via hotkey Ctrl+Alt+R");
+                        _logger.LogInformation("Recording started via hotkey {Modifiers}+{Key}", 
+                            _appSettings.Application.HotKey.Modifiers, 
+                            _appSettings.Application.HotKey.Key);
                     });
                 });
 
-                Title += " [Hotkey: Ctrl+Alt+R enabled]";
-                _logger.LogInformation("Hotkey Ctrl+Alt+R registered successfully");
+                var hotkeyDisplay = $"{_appSettings.Application.HotKey.Modifiers}+{_appSettings.Application.HotKey.Key}";
+                Title += $" [Hotkey: {hotkeyDisplay} enabled]";
+                _logger.LogInformation("Hotkey {HotKey} registered successfully", hotkeyDisplay);
             }
             catch (Exception ex)
             {

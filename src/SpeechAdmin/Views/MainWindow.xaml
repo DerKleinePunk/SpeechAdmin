@@ -64,6 +64,13 @@
                 </Grid>
 
                 <!-- Recording-Buttons -->
+                <GroupBox Header="Aufnahme-Modus" Margin="0,0,0,10" Padding="10">
+                    <CheckBox Content="🎙️ Mikrofon-Streaming mit VAD (experimentell)" 
+                              IsChecked="{Binding UseStreamingMode}"
+                              ToolTip="Aktiviert Echtzeit-Transkription mit Voice Activity Detection. Sprachsegmente werden automatisch erkannt und transkribiert."
+                              FontWeight="SemiBold"/>
+                </GroupBox>
+
                 <StackPanel Orientation="Horizontal"
                             Margin="0,0,0,20"
                             HorizontalAlignment="Center">
@@ -128,8 +135,10 @@
                     <StackPanel>
                         <TextBlock Text="💡 Tipps:" FontWeight="Bold" Foreground="#333" Margin="0,0,0,8"/>
                         <TextBlock Text="• Drücke Ctrl+Alt+R um Aufnahme zu starten" Foreground="#666" FontSize="11" Margin="0,0,0,4"/>
+                        <TextBlock Text="• Datei-Modus: Sprechen → Stoppen → Transkribieren" Foreground="#666" FontSize="11" Margin="0,0,0,4"/>
+                        <TextBlock Text="• Streaming-Modus: Sprechen → Pause → Auto-Transkription" Foreground="#666" FontSize="11" Margin="0,0,0,4"/>
                         <TextBlock Text="• Stelle sicher das Zielfeld fokussiert ist (z.B. Email, Word)" Foreground="#666" FontSize="11" Margin="0,0,0,4"/>
-                        <TextBlock Text="• Dies ist eine Demo-Version" Foreground="#666" FontSize="11"/>
+                        <TextBlock Text="• Silero VAD erkennt automatisch Sprachpausen" Foreground="#666" FontSize="11"/>
                     </StackPanel>
                 </Border>
             </StackPanel>

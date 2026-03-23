@@ -1,9 +1,12 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using SpeechAdmin.Configuration;
 using SpeechAdmin.Services;
 using SpeechAdmin.ViewModels;
 using SpeechAdmin.Views;
 using System;
+using System.IO;
 using System.Windows;
 
 namespace SpeechAdmin
@@ -16,14 +19,25 @@ namespace SpeechAdmin
         private TrayIconService? _trayIconService;
         private IAsyncDisposable? _serviceProvider;
         private ILogger<App>? _logger;
+        private AppSettings? _appSettings;
 
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
 
+            // Load configuration from appsettings.json
+            var configuration = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                .Build();
+
+            _appSettings = new AppSettings();
+            configuration.Bind(_appSettings);
+
             // Setup Dependency Injection and Logging
             var services = new ServiceCollection();
-            services.AddCustomLogging();
+            services.AddSingleton(_appSettings);
+            services.AddCustomLogging(_appSettings);
             services.AddSingleton<SpeechModelManagerService>();
             services.AddSingleton<AudioRecorderService>();
             services.AddSingleton<KeyboardSimulatorService>();
@@ -34,9 +48,10 @@ namespace SpeechAdmin
             _logger = ((IServiceProvider)_serviceProvider).GetRequiredService<ILogger<App>>();
 
             _logger.LogInformation("SpeechAdmin application started");
+            _logger.LogInformation("Configuration loaded from {ConfigPath}", Path.Combine(Directory.GetCurrentDirectory(), "appsettings.json"));
 
             // Initialize main window and view model
-            Current.MainWindow = new MainWindow();
+            Current.MainWindow = new MainWindow(_appSettings);
             var viewModel = ((IServiceProvider)_serviceProvider).GetRequiredService<MainViewModel>();
             Current.MainWindow.DataContext = viewModel;
 

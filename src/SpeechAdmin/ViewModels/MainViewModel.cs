@@ -27,6 +27,7 @@ namespace SpeechAdmin.ViewModels
         private int _selectedModelIndex;
         private bool _isProcessing;
         private string _statusMessage = string.Empty;
+        private bool _useStreamingMode;
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -80,6 +81,12 @@ namespace SpeechAdmin.ViewModels
             set => SetProperty(ref _statusMessage, value);
         }
 
+        public bool UseStreamingMode
+        {
+            get => _useStreamingMode;
+            set => SetProperty(ref _useStreamingMode, value);
+        }
+
         public ObservableCollection<ISpeechModel> AvailableModels { get; }
 
         public RelayCommand? StartRecordingCommand { get; }
@@ -114,6 +121,9 @@ namespace SpeechAdmin.ViewModels
             StopRecordingCommand = new RelayCommand(StopRecording, () => IsRecording);
             SendToApplicationCommand = new RelayCommand(SendToApplication, () => !string.IsNullOrEmpty(TranscribedText));
             InstallModelCommand = new RelayAsyncCommand(InstallSelectedModel);
+
+            // Subscribe to streaming events
+            _audioRecorder.SpeechSegmentDetected += OnSpeechSegmentDetected;
 
             UpdateModelStatus();
             _logger.LogInformation("MainViewModel initialized");
@@ -215,11 +225,23 @@ namespace SpeechAdmin.ViewModels
                     return;
                 }
 
-                _currentAudioPath = Path.Combine(Path.GetTempPath(), $"speech_{Guid.NewGuid()}.wav");
-                _audioRecorder.StartRecording(_currentAudioPath);
-                IsRecording = true;
-                StatusMessage = "🎤 Recording... (Speak now)";
-                _logger.LogInformation("Recording started: {AudioPath}", _currentAudioPath);
+                if (UseStreamingMode)
+                {
+                    // Streaming mode with VAD
+                    _audioRecorder.StartRecording(RecordingMode.StreamWithVAD);
+                    IsRecording = true;
+                    StatusMessage = "🎤 Streaming... (Speak and pause for transcription)";
+                    _logger.LogInformation("Recording started in STREAMING mode");
+                }
+                else
+                {
+                    // File mode (original behavior)
+                    _currentAudioPath = Path.Combine(Path.GetTempPath(), $"speech_{Guid.NewGuid()}.wav");
+                    _audioRecorder.StartRecording(RecordingMode.File, _currentAudioPath);
+                    IsRecording = true;
+                    StatusMessage = "🎤 Recording... (Speak now)";
+                    _logger.LogInformation("Recording started in FILE mode: {AudioPath}", _currentAudioPath);
+                }
             }
             catch (Exception ex)
             {
@@ -237,43 +259,53 @@ namespace SpeechAdmin.ViewModels
             try
             {
                 IsRecording = false;
-                StatusMessage = "⏳ Transcribing...";
-                IsProcessing = true;
-                _logger.LogDebug("Recording stopped, starting transcription");
-
                 _audioRecorder?.StopRecording();
 
-                // Short delay to finalize the file
-                await Task.Delay(500);
-
-                // Transcribe
-                if (!string.IsNullOrEmpty(_currentAudioPath) && File.Exists(_currentAudioPath) && _modelManager != null)
+                if (UseStreamingMode)
                 {
-                    try
-                    {
-                        var text = await _modelManager.TranscribeAsync(_currentAudioPath);
-                        TranscribedText = text;
-                        StatusMessage = "✓ Transcription completed";
-                        _logger.LogInformation("Transcription completed successfully");
-                    }
-                    finally
-                    {
-                        // Cleanup
-                        try
-                        {
-                            File.Delete(_currentAudioPath);
-                            _logger.LogDebug("Temporary audio file deleted");
-                        }
-                        catch
-                        {
-                            _logger.LogWarning("Failed to delete temporary audio file: {AudioPath}", _currentAudioPath);
-                        }
-                    }
+                    // In streaming mode, transcription happens automatically via events
+                    StatusMessage = "✓ Streaming stopped";
+                    _logger.LogInformation("Streaming recording stopped");
                 }
                 else
                 {
-                    StatusMessage = "Error: Audio file not found";
-                    _logger.LogError("Audio file not found: {AudioPath}", _currentAudioPath);
+                    // File mode - transcribe the recorded file
+                    StatusMessage = "⏳ Transcribing...";
+                    IsProcessing = true;
+                    _logger.LogDebug("Recording stopped, starting transcription");
+
+                    // Short delay to finalize the file
+                    await Task.Delay(500);
+
+                    // Transcribe
+                    if (!string.IsNullOrEmpty(_currentAudioPath) && File.Exists(_currentAudioPath) && _modelManager != null)
+                    {
+                        try
+                        {
+                            var text = await _modelManager.TranscribeAsync(_currentAudioPath);
+                            TranscribedText = text;
+                            StatusMessage = "✓ Transcription completed";
+                            _logger.LogInformation("Transcription completed successfully");
+                        }
+                        finally
+                        {
+                            // Cleanup
+                            try
+                            {
+                                File.Delete(_currentAudioPath);
+                                _logger.LogDebug("Temporary audio file deleted");
+                            }
+                            catch
+                            {
+                                _logger.LogWarning("Failed to delete temporary audio file: {AudioPath}", _currentAudioPath);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        StatusMessage = "Error: Audio file not found";
+                        _logger.LogError("Audio file not found: {AudioPath}", _currentAudioPath);
+                    }
                 }
             }
             catch (Exception ex)
@@ -308,6 +340,63 @@ namespace SpeechAdmin.ViewModels
             {
                 StatusMessage = $"Error inserting text: {ex.Message}";
                 _logger.LogError(ex, "Error sending text to application");
+            }
+        }
+
+        /// <summary>
+        /// Handles speech segment detection from streaming mode
+        /// </summary>
+        private async void OnSpeechSegmentDetected(object? sender, AudioSegmentEventArgs e)
+        {
+            try
+            {
+                if (_modelManager == null)
+                    return;
+
+                StatusMessage = "⏳ Transcribing speech segment...";
+                IsProcessing = true;
+                _logger.LogDebug("Speech segment detected, starting transcription");
+
+                // Save audio segment to temporary file
+                var tempFile = Path.Combine(Path.GetTempPath(), $"speech_segment_{Guid.NewGuid()}.wav");
+                await File.WriteAllBytesAsync(tempFile, e.AudioData);
+
+                try
+                {
+                    // Transcribe the segment
+                    var text = await _modelManager.TranscribeAsync(tempFile);
+
+                    // Append to existing text (with space if not empty)
+                    if (!string.IsNullOrEmpty(TranscribedText) && !TranscribedText.EndsWith(" "))
+                    {
+                        TranscribedText += " ";
+                    }
+                    TranscribedText += text;
+
+                    StatusMessage = $"✓ Segment transcribed: \"{text}\"";
+                    _logger.LogInformation("Speech segment transcribed: {Text}", text);
+                }
+                finally
+                {
+                    // Cleanup
+                    try
+                    {
+                        File.Delete(tempFile);
+                    }
+                    catch
+                    {
+                        _logger.LogWarning("Failed to delete temporary segment file: {TempFile}", tempFile);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Error transcribing segment: {ex.Message}";
+                _logger.LogError(ex, "Error transcribing speech segment");
+            }
+            finally
+            {
+                IsProcessing = false;
             }
         }
 

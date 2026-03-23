@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Win32;
+using SpeechAdmin.Ui;
 using System;
 using System.Drawing;
 using System.Windows;
@@ -41,6 +43,10 @@ namespace SpeechAdmin.Services
             };
 
             _contextMenu = new ContextMenuStrip();
+
+            // Apply Dark Mode styling if Windows is in Dark Mode
+            ApplyDarkModeToContextMenu(_contextMenu);
+
             var showItem = _contextMenu.Items.Add("Anzeigen");
             showItem.Click += (s, e) => ShowWindow();
 
@@ -50,6 +56,46 @@ namespace SpeechAdmin.Services
             _notifyIcon.ContextMenuStrip = _contextMenu;
             _notifyIcon.DoubleClick += (s, e) => ShowWindow();
             _logger.LogDebug("Kontextmenü für das Tray-Icon erstellt");
+        }
+
+        /// <summary>
+        /// Applies Dark Mode styling to the context menu if Windows is in Dark Mode
+        /// </summary>
+        private void ApplyDarkModeToContextMenu(ContextMenuStrip menu)
+        {
+            try
+            {
+                if (IsWindowsInDarkMode())
+                {
+                    // Dark mode colors
+                    menu.Renderer = new ToolStripProfessionalRenderer(new DarkModeColorTable());
+                    menu.BackColor = Color.FromArgb(45, 45, 48);
+                    menu.ForeColor = Color.White;
+
+                    _logger.LogDebug("Dark Mode für Kontextmenü aktiviert");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Fehler beim Anwenden des Dark Mode: {Message}", ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Checks if Windows is currently in Dark Mode
+        /// </summary>
+        private static bool IsWindowsInDarkMode()
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+                var value = key?.GetValue("AppsUseLightTheme");
+                return value is 0;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private void ShowWindow()

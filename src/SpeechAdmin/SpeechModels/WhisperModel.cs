@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using SpeechAdmin.Models;
 using SpeechAdmin.Services;
 using System;
 using System.Collections.Generic;
@@ -10,12 +11,12 @@ using Whisper.net;
 using Whisper.net.LibraryLoader;
 using Whisper.net.Logger;
 
-namespace SpeechAdmin.Models
+namespace SpeechAdmin.SpeechModels
 {
     /// <summary>
     /// Implementation of the Whisper speech model
     /// </summary>
-    public class WhisperModel : ISpeechModel
+    public partial class WhisperModel : ISpeechModel
     {
         private readonly string _modelPath;
         private readonly string _modelSize;
@@ -97,7 +98,7 @@ namespace SpeechAdmin.Models
                 if (!IsInstalled)
                     throw new InvalidOperationException($"Model '{Name}' is not installed. Please install first.");
 
-                _logger.LogDebug("🎤 Transcribing audio file with '{ModelName}'...", Name);
+                _logger.LogDebug("Transcribing audio file with '{ModelName}'...", Name);
 
                 var result = new StringBuilder();
 
@@ -113,8 +114,7 @@ namespace SpeechAdmin.Models
                 await foreach (var segment in _whisperProcessor.ProcessAsync(audioStream))
                 {
                     result.Append(segment.Text);
-                    _logger.LogDebug("   [{Start} --> {End}]: {Text}",
-                        segment.Start, segment.End, segment.Text);
+                    LogStartEndText(segment.Start, segment.End, segment.Text);
                 }
 
                 return result.ToString();
